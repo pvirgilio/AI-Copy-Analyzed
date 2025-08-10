@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Analysis {
+  id       String  @id @default(cuid())
+  copyText String //Texto original da copy
+  score    Int    // Score de 0-100
+  analysis Json   // Resultado completo da IA (JSON flexível)
+  createdAt DateTime @default(now()) // Data de criação
+  updatedAt DateTime @updatedAt // Data de atualização
+
+  //Relacionamento com usuário (opcional por enquanto)
+  userId  String?  // Pode ser null se usuário não logado
+  user    User? @relation(fields: [userId], references: [id])
+
+  @@map("analyses") // Nome da Tabela no banco
+
+}
+
+// Modelo para usuários (para futuro)
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  name     String?
+  createdAt DateTime @default(now())
+
+  //Um usuário pode ter várias análises
+  analyses Analysis[]
+
+  @@map("users")
+}
