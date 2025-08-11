@@ -1,9 +1,9 @@
 "use client";
 
 import { CopyAnalysis } from "@/lib/openai";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { Button } from "../ui/button";
-import Image from "next/image";
+import { ScreenshotViewer } from "../ui/screenshot-viewer";
 
 interface UploadedImage {
   id: string;
@@ -27,13 +27,14 @@ interface WebsiteUrl {
 }
 
 export function CopyAnalyzer() {
-  const [copyText, setCopyText] = useState("");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<CopyAnalysis | null>(null);
   const [error, setError] = useState("");
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [websites, setWebsites] = useState<WebsiteUrl[]>([]);
   const [urlInput, setUrlInput] = useState("");
+  const [loadingStage, setLoadingStage] = useState<string>("");
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +57,7 @@ export function CopyAnalyzer() {
     try {
       const url = new URL(string);
       return url.protocol === "http:" || url.protocol === "https:";
-    } catch (_) {
+    } catch {
       return false;
     }
   };
@@ -115,7 +116,7 @@ export function CopyAnalyzer() {
             : w
         )
       );
-    } catch (err) {
+    } catch {
       setWebsites((prev) =>
         prev.map((w) => (w.id === websiteId ? { ...w, status: "error" } : w))
       );
@@ -154,7 +155,7 @@ export function CopyAnalyzer() {
           url,
           base64,
         });
-      } catch (err) {
+      } catch {
         setError("Erro ao processar imagem");
       }
     }
@@ -308,8 +309,21 @@ export function CopyAnalyzer() {
     setLoading(true);
     setError("");
     setAnalysis(null);
+    setLoadingStage("Preparando análise...");
+    setLoadingProgress(10);
 
     try {
+      // Simular progresso durante a análise
+      const progressInterval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev < 90) return prev + 2;
+          return prev;
+        });
+      }, 500);
+
+      setLoadingStage("Aguardando carregamento completo da página...");
+      setLoadingProgress(30);
+
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
@@ -327,6 +341,11 @@ export function CopyAnalyzer() {
         }),
       });
 
+      setLoadingStage("Analisando conteúdo com IA...");
+      setLoadingProgress(70);
+
+      clearInterval(progressInterval);
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
@@ -334,7 +353,12 @@ export function CopyAnalyzer() {
         );
       }
 
+      setLoadingStage("Finalizando análise...");
+      setLoadingProgress(95);
+
       const data = await response.json();
+
+      setLoadingProgress(100);
       setAnalysis(data.analysis);
     } catch (err) {
       console.error("Erro na análise:", err);
@@ -345,6 +369,8 @@ export function CopyAnalyzer() {
       );
     } finally {
       setLoading(false);
+      setLoadingStage("");
+      setLoadingProgress(0);
     }
   };
 
@@ -370,9 +396,8 @@ export function CopyAnalyzer() {
               onPaste={handlePaste}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              onInput={(e) => {
-                const text = extractTextFromEditor();
-                setCopyText(text);
+              onInput={() => {
+                extractTextFromEditor();
               }}
               suppressContentEditableWarning={true}
             />
@@ -561,6 +586,81 @@ export function CopyAnalyzer() {
         </div>
       </div>
 
+      {/* Loading Aprimorado */}
+      {loading && (
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center">
+            <div className="mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg
+                  className="w-8 h-8 text-blue-600 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                Analisando sua página...
+              </h3>
+
+              <p className="text-gray-600 mb-6">
+                {loadingStage || "Preparando análise..."}
+              </p>
+            </div>
+
+            {/* Barra de Progresso */}
+            <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between text-sm text-gray-500 mb-6">
+              <span>Progresso</span>
+              <span>{loadingProgress}%</span>
+            </div>
+
+            {/* Dicas durante o carregamento */}
+            <div className="bg-blue-50 rounded-lg p-4 text-left">
+              <h4 className="font-medium text-blue-800 mb-2 flex items-center">
+                💡 Enquanto você espera...
+              </h4>
+              <div className="text-sm text-blue-700 space-y-2">
+                <p>
+                  • Nossa IA aguarda o carregamento COMPLETO da página (imagens,
+                  fontes, scripts)
+                </p>
+                <p>
+                  • Detecta automaticamente quando todos os elementos estão
+                  prontos
+                </p>
+                <p>
+                  • Analisando tanto o conteúdo textual quanto os elementos
+                  visuais
+                </p>
+                <p>• Identificando gatilhos mentais e pontos de melhoria</p>
+                <p>• Gerando observações específicas para cada seção</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resultados */}
       {analysis && (
         <div className="bg-white rounded-lg shadow-lg p-6">
@@ -671,6 +771,14 @@ export function CopyAnalyzer() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Screenshot e Observações Visuais */}
+      {analysis && analysis.websiteScreenshot && (
+        <ScreenshotViewer
+          screenshot={analysis.websiteScreenshot}
+          visualObservations={analysis.visualObservations}
+        />
       )}
     </div>
   );

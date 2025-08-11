@@ -111,23 +111,39 @@ export async function POST(request: NextRequest) {
     console.log("Iniciando análise da copy...");
     const analysis = await analyzeCopyWithAI(copyText, images, websites);
 
+    // Calcular contadores de imagens
+    const userImageCount = images?.length || 0;
+    const totalImages = userImageCount + (analysis.websiteImageCount || 0);
+
     // Salvar no banco
     const savedAnalysis = await prisma.analysis.create({
       data: {
         copyText,
         score: analysis.score,
-        analysis: analysis as any, // JSON
+        analysis: JSON.parse(JSON.stringify(analysis)),
+        imageCount: totalImages,
+        websiteImageCount: analysis.websiteImageCount || 0,
         // userId: null // Por enquanto sem usuário
       },
     });
 
     console.log("Análise salva com ID:", savedAnalysis.id);
+    console.log(
+      `Total de imagens analisadas: ${totalImages} (${userImageCount} enviadas + ${
+        analysis.websiteImageCount || 0
+      } extraídas de websites)`
+    );
 
     // Resposta
     return NextResponse.json({
       success: true,
       analysis,
       id: savedAnalysis.id,
+      imageStats: {
+        totalImages,
+        userImages: userImageCount,
+        websiteImages: analysis.websiteImageCount || 0,
+      },
     });
   } catch (error) {
     console.error("Erro na API de análise:", error);

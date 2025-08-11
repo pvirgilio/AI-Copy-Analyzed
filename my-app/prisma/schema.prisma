@@ -19,6 +19,11 @@ model Analysis {
   copyText String //Texto original da copy
   score    Int    // Score de 0-100
   analysis Json   // Resultado completo da IA (JSON flexível)
+  
+  // Dados de imagens analisadas
+  imageCount Int @default(0) // Número total de imagens analisadas
+  websiteImageCount Int @default(0) // Número de imagens extraídas de websites
+  
   createdAt DateTime @default(now()) // Data de criação
   updatedAt DateTime @updatedAt // Data de atualização
 
